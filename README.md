@@ -125,4 +125,4 @@ MIT — see [LICENSE](LICENSE).
 
 ## Author
 
-[winter2815651645-collab](https://github.com/winter2815651645-collab)
+James Wang
