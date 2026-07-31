@@ -1,4 +1,4 @@
-"""Tests for Cursor Bridge encoding recovery functions.
+"""Tests for ClipBridge encoding recovery functions.
 
 These tests only exercise the pure-Python encoding logic — no Win32 API calls.
 """
@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cursor_bridge_pure import (
+from clipbridge_pure import (
     has_cjk,
     _recover_utf8_mojibake,
     _recover_utf8_in_utf16le,

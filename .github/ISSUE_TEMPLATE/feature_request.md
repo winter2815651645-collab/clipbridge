@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest an enhancement for Cursor Bridge
+about: Suggest an enhancement for ClipBridge
 title: "[Feature] "
 labels: enhancement
 assignees: winter2815651645-collab
@@ -10,7 +10,7 @@ assignees: winter2815651645-collab
 What frustrates you today?
 
 **Proposed solution**
-What would you like Cursor Bridge to do?
+What would you like ClipBridge to do?
 
 **Alternatives considered**
 Have you tried any workarounds? What were their downsides?

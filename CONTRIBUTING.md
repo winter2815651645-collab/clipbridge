@@ -1,56 +1,57 @@
-# Contributing to Cursor Bridge
+# Contributing to ClipBridge
 
 ## Setup
 
 ```bash
-git clone https://github.com/winter2815651645-collab/cursor-bridge.git
-cd cursor-bridge
+git clone https://github.com/winter2815651645-collab/clipbridge.git
+cd clipbridge
 ```
 
 Python 3.10+ required. No pip install — stdlib only.
 
-## Project Structure
+## Project structure
 
 ```
-cursor-bridge/
-├── cursor_bridge.pyw        # Main application
-├── cursor_bridge_pure.py    # Pure-Python module (importable for tests)
+clipbridge/
+├── clipbridge.pyw            # Main application (system tray + Win32 clipboard)
+├── clipbridge_pure.py        # Encoding recovery logic (importable, testable)
 ├── tests/
 │   └── test_cursor_bridge_pure.py
 ├── .github/workflows/
-│   └── test.yml             # CI
-└── cursor-bridge-startup.vbs # Auto-start helper
+│   └── test.yml              # CI
+└── clipbridge-startup.vbs    # Auto-start helper
 ```
 
-## Running Tests
+## Running tests
 
 ```bash
 pip install pytest
 pytest tests/ -v
 ```
 
-## Coding Conventions
+## Coding conventions
 
 - PEP 8
 - English comments preferred for new code
-- Pure logic goes in `cursor_bridge_pure.py` (testable without Windows)
-- Win32 API code stays in `cursor_bridge.pyw`
+- Pure logic goes in `clipbridge_pure.py` (testable without Windows)
+- Win32 API code stays in `clipbridge.pyw`
 
-## Pull Requests
+## Pull requests
 
 1. Fork and create a feature branch
 2. Add tests for new behavior
 3. Run `pytest` before submitting
 4. Keep changes focused — one thing per PR
 
-## Reporting Bugs
+## Reporting bugs
 
-Use the [bug report template](https://github.com/winter2815651645-collab/cursor-bridge/issues/new?template=bug_report.md). Include:
+Use the [bug report template](https://github.com/winter2815651645-collab/clipbridge/issues/new?template=bug_report.md). Include:
 - Windows version
 - Python version
+- Target app and version
 - Steps to reproduce
 - Expected vs actual behavior
 
-## Feature Requests
+## Feature requests
 
-Use the [feature request template](https://github.com/winter2815651645-collab/cursor-bridge/issues/new?template=feature_request.md). Explain the use case first.
+Use the [feature request template](https://github.com/winter2815651645-collab/clipbridge/issues/new?template=feature_request.md). Explain the use case first.

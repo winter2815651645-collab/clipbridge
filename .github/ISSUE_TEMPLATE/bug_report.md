@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug in Cursor Bridge
+about: Report a bug in ClipBridge
 title: "[Bug] "
 labels: bug
 assignees: winter2815651645-collab
@@ -22,11 +22,11 @@ What should have happened.
 **Environment**
 - Windows version: [e.g. Windows 11 22H2]
 - Python version: [e.g. Python 3.12.3]
-- Cursor version: [e.g. 0.42.0]
+- Target app & version: [e.g. VS Code 1.90, Discord Stable, Cursor 0.42]
 - Source app: [e.g. Chrome, WeChat, VS Code]
 
 **Clipboard sample**
-If possible, paste the original text that caused the issue (before Cursor Bridge processed it).
+If possible, paste the original text that caused the issue.
 
 **Logs**
-Check `bridge_debug.log` next to `cursor_bridge.pyw` for relevant entries.
+Check `bridge_debug.log` next to `clipbridge.pyw` for relevant entries.

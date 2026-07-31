@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Cursor Bridge — 中文剪贴板桥
+ClipBridge — 剪贴板编码桥
 =============================
 纯托盘应用，监控剪贴板中的中文文本，通过 Win32 API 以 CF_UNICODETEXT
-格式重写剪贴板，解决 Cursor 编辑器对话框粘贴中文乱码的问题。
+格式重写剪贴板，解决 Chromium/Electron 应用剪贴板 CJK 编码错误。
 
 触发方式：
-  - 自动模式：检测剪贴板出现中文 → 自动处理（用户只管 Ctrl+V 贴入 Cursor）
+  - 自动模式：检测剪贴板出现中文 → 自动处理（用户只管 Ctrl+V 贴入目标应用）
   - 左键托盘图标：弹出输入窗口，粘贴/编辑 → 自动复制
   - 全局快捷键 Win+Shift+V：即时处理当前剪贴板内容
 
 依赖：Python 3 标准库（tkinter + ctypes），无第三方包。
-启动：pythonw cursor_bridge.pyw
+启动：pythonw clipbridge.pyw
 """
 
 import tkinter as tk
@@ -25,6 +25,7 @@ import sys
 import os
 import time
 import traceback
+from clipbridge_pure import has_cjk, _recover_utf8_mojibake, _recover_utf8_in_utf16le
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Win32 Constants
@@ -52,16 +53,6 @@ HWND_MESSAGE  = -3
 
 IDI_INFORMATION = 32516
 
-# CJK 字符检测正则（覆盖中日韩统一表意文字、标点、全角符号）
-CJK_RE = re.compile(
-    r'[一-鿿'          # CJK Unified Ideographs
-    r'㐀-䶿'           # CJK Extension A
-    r'豈-﫿'           # CJK Compatibility
-    r'　-〿'           # CJK Symbols
-    r'＀-￯'           # Fullwidth Forms
-    r'⺀-⻿'           # CJK Radicals
-    r']'
-)
 
 # Menu constants
 MF_STRING    = 0x0000
@@ -297,7 +288,7 @@ user32.PostMessageW.restype = wintypes.BOOL
 # Clipboard Operations
 # ═══════════════════════════════════════════════════════════════════════════
 
-# HTML Format — what Chromium/Electron (Cursor) uses for rich-text copy
+# HTML Format — what Chromium/Electron apps (Cursor, VS Code, etc.) use for rich-text copy
 _CF_HTML = user32.RegisterClipboardFormatW("HTML Format")
 
 # All known text-bearing formats to try, in priority order
@@ -380,103 +371,8 @@ def _enumerate_all_formats_locked() -> str | None:
     return None
 
 
-def _recover_utf8_mojibake(text: str) -> str | None:
-    """
-    Detect if `text` looks like UTF-8 bytes misinterpreted as Latin-1,
-    and recover the original CJK text. Returns None if not mojibake.
-
-    Example: 'è¿è¡Œä¸­' → '运行中'
-    """
-    if not text or has_cjk(text):
-        return None
-
-    # Count Latin-1 accented chars; if >30% of non-ASCII chars are in 0xC0–0xFF
-    # range, it's likely mojibake
-    non_ascii = [c for c in text if ord(c) >= 128]
-    if not non_ascii:
-        return None
-    latin1_high = sum(1 for c in non_ascii if 0xC0 <= ord(c) <= 0xFF)
-    if latin1_high / len(non_ascii) < 0.3:
-        return None
-
-    # Try to recover: encode back as Latin-1 bytes → decode as UTF-8
-    try:
-        raw = text.encode('latin-1')
-        recovered = raw.decode('utf-8')
-        if has_cjk(recovered):
-            return recovered
-    except (UnicodeEncodeError, UnicodeDecodeError):
-        pass
-    return None
 
 
-def _recover_utf8_in_utf16le(raw: bytes) -> str | None:
-    """
-    Cursor's AI chat panel (Chromium WebView) sometimes puts UTF-8 bytes
-    directly into CF_UNICODETEXT. Two patterns are observed:
-
-    Pattern A — byte-expanded: each UTF-8 byte stored as a 16-bit char
-    (non-zero even bytes, 0x00 odd bytes).
-      Raw:  E6 00 8E 00 A7 00 E5 00 88 00 B6 00 ...
-      Even: E6 8E A7 E5 88 B6 → UTF-8 decode → 控制
-
-    Pattern B — raw UTF-8: no padding, just the UTF-8 stream verbatim.
-      Raw:  41 6E 74 68 72 6F 70 69 63 20 41 50 49
-      wstring_at interprets as UTF-16LE pairs → CJK mojibake (湁桴潲楰⁣偁I)
-      Fix: decode raw bytes directly as UTF-8 → Anthropic API
-
-    Safety for Pattern B: only applied when decoded text is pure ASCII
-    (English recovery). The edge case where proper UTF-16LE CJK text has
-    bytes that also form valid UTF-8 is possible but rare in practice.
-    """
-    if len(raw) < 2:
-        return None
-
-    # ── Pattern A: byte-expanded (alternating 0x00) ──
-    # At least 80% of odd bytes must be 0x00, and at least 50% of even
-    # bytes non-zero, to qualify as byte-expanded UTF-8-in-UTF16LE.
-    odd_zeros = sum(1 for i in range(1, min(len(raw), 100), 2) if raw[i] == 0)
-    odd_total = min(len(raw), 100) // 2
-    even_nonzero = sum(1 for i in range(0, min(len(raw), 100), 2) if raw[i] != 0)
-    even_total = (min(len(raw), 100) + 1) // 2
-
-    if odd_total > 0 and odd_zeros / odd_total >= 0.8:
-        if even_nonzero / even_total >= 0.5:
-            # Extract even bytes (the UTF-8 stream), strip trailing nulls
-            extracted = bytes(raw[i] for i in range(0, len(raw), 2))
-            extracted = extracted.rstrip(b'\x00')
-            try:
-                return extracted.decode('utf-8')
-            except UnicodeDecodeError:
-                pass
-        return None  # too many nulls in even bytes → likely actual ASCII
-
-    # ── Pattern B: raw UTF-8 (no 0x00 alternation) ──
-    # Cursor sometimes drops raw UTF-8 into CF_UNICODETEXT. When all bytes
-    # decode as valid UTF-8 yielding pure ASCII, we've recovered garbled
-    # English text (e.g., "Anthropic API" → "湁桴潲楰⁣偁I" → fix back).
-    #
-    # NOTE: a properly-stored UTF-16LE CJK string whose bytes happen to
-    # also be valid UTF-8 (e.g. "你好" bytes 60 4F 7D 59 decode as "`O}Y")
-    # would be mis-corrected. This is rare — most CJK UTF-16LE code units
-    # contain bytes ≥0x80 that break UTF-8 decoding.
-    raw_stripped = raw.rstrip(b'\x00')
-    if raw_stripped:
-        try:
-            recovered = raw_stripped.decode('utf-8')
-            # Only recover text that looks like actual English/code content:
-            # pure ASCII AND >50% alphabetic characters.
-            # This prevents false positives on real UTF-16LE CJK text whose
-            # bytes happen to form valid ASCII UTF-8 (e.g., "你好" →
-            # "`O}Y", which has only 50% alpha and is rejected).
-            if recovered.isascii():
-                alpha_ratio = sum(c.isalpha() for c in recovered) / max(len(recovered), 1)
-                if alpha_ratio > 0.5:
-                    return recovered
-        except UnicodeDecodeError:
-            pass
-
-    return None
 
 
 # ── File-based debug log (console may not be visible with .pyw) ──────────
@@ -543,7 +439,7 @@ def clipboard_read() -> str | None:
         _log("clipboard_read: OpenClipboard failed")
         return None
     try:
-        # Strategy 0: raw CF_UNICODETEXT → UTF-8-in-UTF16LE recovery (Cursor WebView)
+        # Strategy 0: raw CF_UNICODETEXT → UTF-8-in-UTF16LE recovery (Chromium/Electron WebView)
         raw = _read_format_locked(CF_UNICODETEXT)
         if raw:
             recovered = _recover_utf8_in_utf16le(raw)
@@ -629,9 +525,6 @@ def clipboard_write(text: str) -> bool:
         user32.CloseClipboard()
 
 
-def has_cjk(text: str) -> bool:
-    """True if text contains CJK characters."""
-    return bool(CJK_RE.search(text))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -815,7 +708,7 @@ def _tray_thread_main(event_queue: queue.Queue):
     wc.cbSize        = sizeof(WNDCLASSEXW)
     wc.lpfnWndProc   = cast(wndproc, c_void_p)
     wc.hInstance     = hinst
-    wc.lpszClassName = "CursorBridgeTrayWnd"
+    wc.lpszClassName = "ClipBridgeTrayWnd"
 
     atom = user32.RegisterClassExW(byref(wc))
     if not atom:
@@ -823,7 +716,7 @@ def _tray_thread_main(event_queue: queue.Queue):
         return
 
     hwnd = user32.CreateWindowExW(
-        0, "CursorBridgeTrayWnd", "CursorBridge", 0,
+        0, "ClipBridgeTrayWnd", "ClipBridge", 0,
         0, 0, 0, 0,
         wintypes.HWND(HWND_MESSAGE), 0, hinst, 0
     )
@@ -840,7 +733,7 @@ def _tray_thread_main(event_queue: queue.Queue):
     nid.uFlags           = NIF_ICON | NIF_MESSAGE | NIF_TIP
     nid.uCallbackMessage = WM_TRAYICON
     nid.hIcon            = hicon
-    nid.szTip            = "Cursor Bridge - 中文剪贴板桥"
+    nid.szTip            = "ClipBridge - 剪贴板编码桥"
 
     if not shell32.Shell_NotifyIconW(NIM_ADD, byref(nid)):
         event_queue.put(("error", "Shell_NotifyIconW failed"))
@@ -978,7 +871,7 @@ class PopupWindow:
 
     def _build(self):
         self.win = tk.Toplevel(self.root)
-        self.win.title("Cursor Bridge")
+        self.win.title("ClipBridge")
         self.win.overrideredirect(True)
         self.win.attributes("-topmost", True)
         self.win.attributes("-toolwindow", True)
@@ -1029,7 +922,7 @@ class PopupWindow:
                      tags=("logo", "title_bar"))
 
         # ── Title text (small, refined) ──
-        c.create_text(34, 17, text="Cursor Bridge", anchor="w",
+        c.create_text(34, 17, text="ClipBridge", anchor="w",
                       fill="#999999", font=("Segoe UI", 9),
                       tags=("logo", "title_bar"))
 
@@ -1328,7 +1221,7 @@ class PopupWindow:
         text = self.get_text()
         if text:
             if clipboard_write(text):
-                self.set_status_line("已复制，可贴入 Cursor", self.CLR["success"])
+                self.set_status_line("已复制，可贴入目标应用", self.CLR["success"])
             else:
                 self.set_status_line("复制失败", self.CLR["error"])
 
@@ -1337,12 +1230,12 @@ class PopupWindow:
     def _show_about(self):
         import tkinter.messagebox as mb
         mb.showinfo(
-            "关于 Cursor Bridge",
-            "Cursor Bridge  v1.9\n\n"
-            "中文剪贴板桥 — 解决 Cursor 编辑器\n"
-            "中文粘贴乱码问题\n\n"
+            "关于 ClipBridge",
+            "ClipBridge  v2.0\n\n"
+            "剪贴板编码桥 — 解决 Chromium/Electron 应用\n"
+            "CJK 编码乱码问题\n\n"
             "纯 stdlib 实现 · tkinter + ctypes\n"
-            "GitHub: github.com/winter2815651645-collab/cursor-bridge",
+            "GitHub: github.com/winter2815651645-collab/clipbridge",
             parent=self.win if self.win and self.win.winfo_exists() else self.root,
         )
 
@@ -1357,7 +1250,7 @@ class App:
     def __init__(self):
         self.root = tk.Tk()
         self.root.withdraw()
-        self.root.title("Cursor Bridge")
+        self.root.title("ClipBridge")
 
         # Global tkinter exception handler — write to debug log instead of
         # silently killing the process (pythonw has no console for stderr).
@@ -1389,7 +1282,7 @@ class App:
                     self._tray_hwnd = msg[1]
                     break
                 elif msg[0] == "error":
-                    print(f"[Cursor Bridge] 托盘初始化失败: {msg[1]}", file=sys.stderr)
+                    print(f"[ClipBridge] 托盘初始化失败: {msg[1]}", file=sys.stderr)
                     break
             except queue.Empty:
                 continue
@@ -1470,7 +1363,7 @@ class App:
 # ═══════════════════════════════════════════════════════════════════════════
 
 def main():
-    _log("=== Cursor Bridge v1.9 启动 ===")
+    _log("=== ClipBridge v2.0 启动 ===")
     App().run()
 
 
