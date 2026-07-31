@@ -16,7 +16,7 @@ clipbridge/
 ├── clipbridge.pyw            # Main application (system tray + Win32 clipboard)
 ├── clipbridge_pure.py        # Encoding recovery logic (importable, testable)
 ├── tests/
-│   └── test_cursor_bridge_pure.py
+│   └── test_clipbridge_pure.py
 ├── .github/workflows/
 │   └── test.yml              # CI
 └── clipbridge-startup.vbs    # Auto-start helper
