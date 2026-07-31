@@ -29,7 +29,7 @@ desktop.ini
 *.log
 bridge_debug.log
 debug_*.png
-CURSOR_BRIDGE_RELEASE_PLAN.md
+CLIPBRIDGE_RELEASE_PLAN.md
 
 # Tool configs
 .agentcad/
