@@ -29,4 +29,4 @@ What should have happened.
 If possible, paste the original text that caused the issue.
 
 **Logs**
-Check `bridge_debug.log` next to `clipbridge.pyw` for relevant entries.
+Run ClipBridge with `--debug` (`pythonw clipbridge.pyw --debug`), reproduce the issue, then check your Desktop for `bridge_debug.log`. Attach relevant entries.
