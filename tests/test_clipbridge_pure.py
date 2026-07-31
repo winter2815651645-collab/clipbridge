@@ -1,13 +1,13 @@
-"""Tests for Cursor Bridge encoding recovery functions.
+"""Tests for ClipBridge encoding recovery functions.
 
-These tests only exercise the pure-Python encoding logic — no Win32 API calls.
+These tests only exercise the pure-Python encoding logic � No Win32 API calls.
 """
 
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cursor_bridge_pure import (
+from clipbridge_pure import (
     has_cjk,
     _recover_utf8_mojibake,
     _recover_utf8_in_utf16le,
@@ -18,15 +18,13 @@ class TestHasCJK:
     """CJK detection tests."""
 
     def test_chinese(self):
-        assert has_cjk("你好世界")
+        assert has_cjk("\u4f60\u597d\u4e16\u754c")
 
     def test_japanese(self):
-        # Japanese kanji (CJK ideographs) detected; pure kana are not
-        assert has_cjk("日本語")  # 日 and 本 are CJK, 語 is CJK
+        assert has_cjk("\u65e5\u672c\u8a9e")
 
     def test_korean(self):
-        # Korean hanja (CJK ideographs) detected; pure hangul is not
-        assert has_cjk("大韓民國")  # all CJK
+        assert has_cjk("\u5927\u97d3\u6c11\u570b")
 
     def test_ascii_only(self):
         assert not has_cjk("Hello World")
@@ -35,24 +33,22 @@ class TestHasCJK:
         assert not has_cjk("test 123 ABC")
 
     def test_mixed_cjk_ascii(self):
-        assert has_cjk("Hello 世界")
+        assert has_cjk("Hello \u4e16\u754c")
 
     def test_empty(self):
         assert not has_cjk("")
 
 
 class TestRecoverUtf8Mojibake:
-    """Latin-1 → UTF-8 mojibake recovery."""
+    """Latin-1 to UTF-8 mojibake recovery."""
 
     def test_chinese_mojibake(self):
-        # "运行中" encoded as UTF-8 then decoded as Latin-1
-        text = "运行中".encode('utf-8').decode('latin-1')
+        text = "\u8fd0\u884c\u4e2d".encode('utf-8').decode('latin-1')
         result = _recover_utf8_mojibake(text)
-        assert result == "运行中"
+        assert result == "\u8fd0\u884c\u4e2d"
 
     def test_already_valid_cjk(self):
-        # Should return None when text is already valid CJK
-        result = _recover_utf8_mojibake("你好世界")
+        result = _recover_utf8_mojibake("\u4f60\u597d\u4e16\u754c")
         assert result is None
 
     def test_ascii_text(self):
@@ -64,35 +60,27 @@ class TestRecoverUtf8Mojibake:
         assert result is None
 
     def test_garbled_text(self):
-        # Chinese text → UTF-8 → mis-decoded as Latin-1 → should recover
-        mojibake = "运行中".encode('utf-8').decode('latin-1')
+        mojibake = "\u8fd0\u884c\u4e2d".encode('utf-8').decode('latin-1')
         result = _recover_utf8_mojibake(mojibake)
-        assert result == "运行中"
+        assert result == "\u8fd0\u884c\u4e2d"
 
 
 class TestRecoverUtf8InUtf16LE:
     """Pattern A + Pattern B recovery from raw CF_UNICODETEXT bytes."""
 
-    # ── Pattern A: byte-expanded UTF-8 ──
-
     def test_pattern_a_chinese(self):
-        # Simulate: "控制" → UTF-8 bytes → each byte as 16-bit LE char
-        utf8 = "控制".encode('utf-8')  # e6 8e a7 e5 88 b6
-        raw = bytes(b for byte in utf8 for b in (byte, 0))  # e6 00 8e 00 ...
+        utf8 = "\u63a7\u5236".encode('utf-8')
+        raw = bytes(b for byte in utf8 for b in (byte, 0))
         result = _recover_utf8_in_utf16le(raw)
-        assert result == "控制"
+        assert result == "\u63a7\u5236"
 
     def test_pattern_a_ascii_alternating(self):
-        # "abc" → UTF-8 bytes → expanded
         utf8 = "abc".encode('utf-8')
         raw = bytes(b for byte in utf8 for b in (byte, 0))
         result = _recover_utf8_in_utf16le(raw)
         assert result == "abc"
 
-    # ── Pattern B: raw UTF-8 in CF_UNICODETEXT ──
-
     def test_pattern_b_english(self):
-        # "Anthropic API" → UTF-8 bytes → dumped directly into CF_UNICODETEXT
         raw = "Anthropic API".encode('utf-8')
         result = _recover_utf8_in_utf16le(raw)
         assert result == "Anthropic API"
@@ -101,8 +89,6 @@ class TestRecoverUtf8InUtf16LE:
         raw = "function import return class".encode('utf-8')
         result = _recover_utf8_in_utf16le(raw)
         assert result == "function import return class"
-
-    # ── Edge cases ──
 
     def test_empty_bytes(self):
         result = _recover_utf8_in_utf16le(b'')
@@ -113,16 +99,11 @@ class TestRecoverUtf8InUtf16LE:
         assert result is None
 
     def test_short_utf16le_not_expanded(self):
-        # "Hi" in proper UTF-16LE: H\x00i\x00
         raw = "Hi".encode('utf-16-le')
-        # Pattern A check: odd bytes are 0x00 (true), even bytes H,i non-zero (true)
-        # → would decode "Hi" as UTF-8 → "Hi"
         result = _recover_utf8_in_utf16le(raw)
         assert result == "Hi"
 
     def test_proper_utf16le_cjk_not_mistriggered(self):
-        # "你好" in proper UTF-16LE — should NOT match Pattern B
-        # because its bytes don't form valid ASCII UTF-8
-        raw = "你好".encode('utf-16-le')
+        raw = "\u4f60\u597d".encode('utf-16-le')
         result = _recover_utf8_in_utf16le(raw)
-        assert result is None  # 4f60 597d → bytes 60 4F 7D 59 → non-ASCII in UTF-8 decode
+        assert result is None

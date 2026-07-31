@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.0] - 2026-07-31
+
+### Changed
+- Project renamed from "Cursor Bridge" to "ClipBridge" — same fix, all Chromium/Electron apps
+- Main application: `cursor_bridge.pyw` → `clipbridge.pyw`
+- Startup script: `cursor-bridge-startup.vbs` → `clipbridge-startup.vbs`
+- Encoding logic extracted to standalone `clipbridge_pure.py` (importable, testable without Windows)
+- Version number bumped to v2.0.0 to reflect the repositioning
+
+### Fixed
+- Test file now correctly imports from `clipbridge_pure` instead of non-existent `cursor_bridge_pure`
+
 ## [1.9.0] - 2026-07-09
 
 ### Added

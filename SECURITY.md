@@ -4,8 +4,8 @@
 
 | Version | Supported          |
 |---------|--------------------|
-| 1.9.x   | :white_check_mark: |
-| < 1.9   | :x:                |
+| 2.0.x   | :white_check_mark: |
+| < 2.0   | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -17,7 +17,7 @@ You can expect a response within 48 hours. After triage, we will send regular up
 
 ## Scope
 
-Cursor Bridge is a local clipboard tool that runs entirely on your machine. Security concerns primarily involve:
+ClipBridge is a local clipboard tool that runs entirely on your machine. Security concerns primarily involve:
 
 - Clipboard data handling (text stays local, never transmitted)
 - Win32 API usage (standard Windows clipboard APIs)
