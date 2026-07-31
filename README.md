@@ -54,6 +54,12 @@ Two recovery patterns:
 pythonw clipbridge.pyw
 ```
 
+To enable debug logging (writes clipboard activity to `bridge_debug.log` on your Desktop):
+
+```bash
+pythonw clipbridge.pyw --debug
+```
+
 ### Auto-start on boot
 
 1. Place `clipbridge-startup.vbs` **in the same folder** as `clipbridge.pyw`
